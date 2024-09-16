@@ -74,6 +74,15 @@ type hand interface {
 	Handle(pattern string, handler http.Handler)
 }
 
+func customCacheMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Set custom headers
+        // w.Header().Set("Last-Modified", LastModified)
+        w.Header().Set("Cache-Control", "public,max-age=31536000,immutable") // immutable cache for 1 year
+        next.ServeHTTP(w, r)
+    })
+}
+
 func HandleHttp(config *Config, clients *ClientsStruct, serveMux hand) {
 
 	assets, _ := Assets()
@@ -92,7 +101,7 @@ func HandleHttp(config *Config, clients *ClientsStruct, serveMux hand) {
 	v := reflect.ValueOf(serveMux)
 	if serveMux == nil || v.IsNil() {
 		utils.Logger.Debug("Using net/http")
-		http.Handle(config.HttpPathPrefix, http.StripPrefix(config.HttpPathPrefix, fs))
+		http.Handle(config.HttpPathPrefix, customCacheMiddleware(http.StripPrefix(config.HttpPathPrefix, fs)))
 		http.HandleFunc(config.HttpPathPrefix+"api/check-pass", handleCheckPass(config.UiPass))
 		http.HandleFunc(config.HttpPathPrefix+"api/status", handleStatus(config))
 		http.HandleFunc(config.HttpPathPrefix+"api/client/set-status", handleClientStatus(clients))
@@ -103,7 +112,7 @@ func HandleHttp(config *Config, clients *ClientsStruct, serveMux hand) {
 		http.HandleFunc(config.HttpPathPrefix+"api/log", apiKeyMiddleware(config.ApiKey, handleLog(Ch)))
 	} else {
 		utils.Logger.Debug("Using serveMux", serveMux)
-		serveMux.Handle(config.HttpPathPrefix, http.StripPrefix(config.HttpPathPrefix, fs))
+		serveMux.Handle(config.HttpPathPrefix, customCacheMiddleware(http.StripPrefix(config.HttpPathPrefix, fs)))
 		serveMux.HandleFunc(config.HttpPathPrefix+"api/check-pass", handleCheckPass(config.UiPass))
 		serveMux.HandleFunc(config.HttpPathPrefix+"api/status", handleStatus(config))
 		serveMux.HandleFunc(config.HttpPathPrefix+"api/client/set-status", handleClientStatus(clients))
